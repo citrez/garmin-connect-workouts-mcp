@@ -1,4 +1,5 @@
 import { GarminAuth } from "./garmin-auth.js";
+import { GarminError } from "./errors.js";
 import { LoginSession } from "./login-session.js";
 
 const session = new LoginSession();
@@ -12,7 +13,7 @@ try {
       // Only known, authored messages are returned; browser errors can contain URLs.
       const message = error instanceof Error ? error.message : "Login failed.";
       const known = /^(The Garmin login profile|Chrome is missing|Garmin browser login needs|Could not open the Garmin login browser|Login window closed|Timed out waiting for login|Login did not produce)/;
-      session.write({ state: "error", message: known.test(message) ? message : "Garmin login failed while opening the page or saving the session. Check your connection and configuration directory permissions, then retry." });
+      session.write({ state: "error", code: error instanceof GarminError ? error.code : "LOGIN_FAILED", message: error instanceof GarminError || known.test(message) ? message : "Garmin login failed while opening the page or saving the session. Check your connection and configuration directory permissions, then retry." });
     } finally {
       session.release();
     }

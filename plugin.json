@@ -1,0 +1,31 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "garmin-workouts",
+  "version": "1.3.0",
+  "description": "Create structured Garmin workouts from natural-language training sessions.",
+  "author": { "name": "citrez", "url": "https://github.com/citrez" },
+  "homepage": "https://github.com/citrez/garmin-connect-workouts-mcp",
+  "repository": "https://github.com/citrez/garmin-connect-workouts-mcp",
+  "license": "MIT",
+  "extensions": {
+    "com.openai": {
+      "mcpServers": "./mcp.json",
+      "skills": "./skills/",
+      "onboardingSkill": "./skills/garmin-setup/SKILL.md",
+      "requires_local_executor": true,
+      "interface": {
+        "displayName": "Garmin Workouts",
+        "shortDescription": "Turn your training session into a Garmin workout",
+        "developerName": "citrez",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write"],
+        "websiteURL": "https://github.com/citrez/garmin-connect-workouts-mcp",
+        "privacyPolicyURL": "https://github.com/citrez/garmin-connect-workouts-mcp/blob/main/docs/privacy.md",
+        "defaultPrompt": ["Connect my Garmin account", "Create an interval workout on Garmin"],
+        "brandColor": "#16A085",
+        "composerIcon": "./assets/icon.png",
+        "logo": "./assets/icon.png"
+      }
+    }
+  }
+}

@@ -40,7 +40,7 @@ describe("login coordination", () => {
     expect(session.read()?.message).toContain("stopped before completing");
     session.write({ state: "error", message: "Chrome is missing" });
     expect(new LoginSession(path).read()?.message).toBe("Chrome is missing");
-    expect(statSync(join(path, "login-status.json")).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") expect(statSync(join(path, "login-status.json")).mode & 0o777).toBe(0o600);
   });
 
   it("explains interrupted lock recovery rather than stealing the guard", () => {
@@ -59,7 +59,7 @@ describe("Garmin session handling", () => {
     expect(await new GarminAuth(path).getValidAuth()).toEqual(auth);
     expect(fetch.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
     expect(fetch.mock.calls[0][1].redirect).toBe("error");
-    fetch.mockResolvedValue({ ok: false });
+    fetch.mockResolvedValue({ ok: false, status: 401 });
     expect(await new GarminAuth(path).getValidAuth()).toBeNull();
   });
 
@@ -68,7 +68,7 @@ describe("Garmin session handling", () => {
     const auth = new GarminAuth(path);
     // Exercise storage separately from the interactive browser.
     (auth as any).storeAuth({ cookies: "test", csrfToken: "test", capturedAt: 1 });
-    expect(statSync(file).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") expect(statSync(file).mode & 0o777).toBe(0o600);
     expect(JSON.parse(readFileSync(file, "utf8")).cookies).toBe("test");
   });
 

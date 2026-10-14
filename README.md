@@ -27,37 +27,84 @@ directly in your account.
   itself; every duration and target is an explicit, unit-tagged field, so
   there's nothing for a string like "10 min" to be silently misread as.
 
-## Quick Start (maintained fork)
+## Install
 
-This fork is currently installed from source. Its reserved npm identity is
-`@citrez/garmin-connect-workouts-mcp`; version 1.2.0 has **not** been published.
+Requires **Node >=22.12.0** on macOS, Windows, or Linux. Garmin sign-in needs a
+local graphical desktop. This is a desktop integration, not a hosted MCP service.
+
+### Prebuilt GitHub package
+
+Download/install the versioned release; no clone, pnpm, compilation, or browser
+postinstall script is required:
 
 ```bash
-git clone https://github.com/citrez/garmin-connect-workouts-mcp.git
-cd garmin-connect-workouts-mcp
-pnpm install --frozen-lockfile
-pnpm run build
+npm install --global https://github.com/citrez/garmin-connect-workouts-mcp/releases/download/v1.3.0/citrez-garmin-connect-workouts-mcp-1.3.0.tgz
+garmin-connect-workouts-mcp doctor
+garmin-connect-workouts-mcp setup --install-browser
+garmin-connect-workouts-mcp login
 ```
 
-Configure any local stdio MCP client with `node` as the command and the
-absolute path to `dist/mcp-server.js` as its argument. For example:
+Setup reuses installed Chrome when available. Otherwise `--install-browser`
+downloads a matching Chrome for Testing into this application's storage.
+Sign in and complete MFA on Garmin's website in the dedicated browser window.
+
+Configure your MCP client:
 
 ```json
 {
   "mcpServers": {
     "garmin-workouts": {
-      "command": "node",
-      "args": ["/absolute/path/garmin-connect-workouts-mcp/dist/mcp-server.js"]
+      "command": "garmin-connect-workouts-mcp",
+      "args": []
     }
   }
 }
 ```
 
-Restart/reconnect your MCP client after changing its configuration.
+For Codex's `config.toml`:
+
+```toml
+[mcp_servers.garmin-workouts]
+command = "garmin-connect-workouts-mcp"
+```
+
+Restart/reconnect your MCP client after changing its configuration. The executable
+must be on the desktop client's PATH; if necessary use its full installed path.
+
+### Codex plugin
+
+Download `garmin-workouts-plugin-1.3.0.zip` from the
+[GitHub release](https://github.com/citrez/garmin-connect-workouts-mcp/releases/tag/v1.3.0)
+and extract it into a folder. It contains the standalone server, dependencies,
+setup and workout skills, and a repo marketplace at `.agents/plugins/marketplace.json`.
+Open that folder as a trusted project in Codex, refresh/restart the app, choose
+**Garmin Workouts** from its local plugin source, install it, and run setup.
+Alternatively add it to your personal marketplace; see [plugin installation](docs/distribution.md).
+
+The plugin runs locally and requires Node. Installing it does not share the
+publisher's Garmin account: every user signs into their own account.
+
+### npm registry (after publication)
+
+The package identity is `@citrez/garmin-connect-workouts-mcp`. Registry publication
+is a separate maintainer step; the GitHub archives can be distributed independently.
+Once 1.3.0 is published, clients can use:
+
+```json
+{
+  "mcpServers": {
+    "garmin-workouts": {
+      "command": "npx",
+      "args": ["--yes", "@citrez/garmin-connect-workouts-mcp@1.3.0"]
+    }
+  }
+}
+```
 
 ## Authentication
 
-1. Run `authenticate_garmin`. It returns promptly and starts a separate local
+1. Run `doctor_garmin`; if Chrome is missing, run `setup_garmin` with
+   `installBrowser=true`. Then run `authenticate_garmin`. It returns promptly and starts a separate local
    login helper, which survives MCP request timeouts and client restarts.
 2. Sign in and complete MFA directly in the dedicated Chrome window.
 3. Run `check_garmin_auth` to see progress, completion, or an actionable error.
@@ -83,10 +130,10 @@ configuration directory private. Personal browser profiles are never attached.
 - `GARMIN_CONFIG_DIR`: override the configuration/profile directory. All MCP
   clients that should share a login must use the same directory.
 - `GARMIN_BROWSER_PATH`: use an installed Chrome/Chromium executable instead of
-  Puppeteer's bundled Chrome. On macOS this must point to the executable inside
+  the automatically detected/managed Chrome. On macOS this must point to the executable inside
   the `.app`, not the `.app` directory.
-- Missing Chrome: run `npx puppeteer browsers install chrome` **from this
-  package's directory**, so the browser version matches its Puppeteer dependency.
+- Missing Chrome: run `garmin-connect-workouts-mcp setup --install-browser`, or
+  use `setup_garmin` with `installBrowser=true`. Package installation downloads no browser.
 - Busy profile: reconnect is attempted automatically. If the existing browser
   cannot be reached, close only the dedicated Garmin login window and retry.
 - Interrupted coordination: if a crashed helper left `login-claim.lock`, remove
@@ -113,6 +160,23 @@ developer credentials. This release improves the existing web-session adapter.
 Safari is not supported by Puppeteer, and copying a personal Safari session into
 this server is not part of the login flow.
 
+Disconnect with `disconnect_garmin` or CLI `logout` to close the dedicated browser
+and remove local credentials, progress and browser profile. This leaves workouts
+and browser downloads intact, and does not revoke Garmin sessions on other devices.
+Disconnect refuses while a login is running: close that window and wait for its
+helper to finish first. See [privacy](docs/privacy.md).
+
+## CLI
+
+| Command | Purpose |
+|---|---|
+| `serve` (default) | Start MCP over stdio. |
+| `doctor [--json] [--check-connection]` | Inspect prerequisites; optionally validate the saved session. |
+| `setup [--install-browser] [--json]` | Prepare storage; optionally install missing Chrome. |
+| `login` | Sign in interactively; complete MFA in the browser. |
+| `logout` | Close the dedicated browser and clear local sign-in data. |
+| `--help` / `--version` | Show usage or installed version. |
+
 ## Tools
 
 | Tool | Description |
@@ -125,6 +189,17 @@ this server is not part of the login flow.
 | `schedule_garmin_workout` | Put a workout on the Garmin Connect calendar for a date. |
 | `check_garmin_auth` | Check whether the stored Garmin session still works. |
 | `authenticate_garmin` | Start/resume login in the background; check progress with `check_garmin_auth`. |
+| `doctor_garmin` | Inspect prerequisites; optionally check the session. |
+| `setup_garmin` | Prepare storage and optionally download missing Chrome. |
+| `disconnect_garmin` | Clear local sign-in data and close the dedicated browser. |
+
+Every tool declares an output schema and returns both human-readable text and
+`structuredContent`: `ok`, `state` (`success`, `pending`, `error`), `message`, and
+optional `data`, `code`, `status`, and `retryAfterSeconds`. Errors set `isError=true`.
+`AUTH_REQUIRED` needs sign-in; `NETWORK_ERROR`, `RATE_LIMITED`, and
+`GARMIN_UNAVAILABLE` preserve the session and do not trigger re-authentication.
+Writes are never retried automatically. After an ambiguous network failure, inspect
+Garmin before repeating a create/schedule operation to avoid duplicates.
 
 ## Usage Examples
 
@@ -150,8 +225,11 @@ explicitly for a narrower or different range.
 ```bash
 pnpm install
 pnpm test          # vitest: encoders + golden-file tests against real captured payloads
-pnpm run build      # compile TypeScript to dist/
+pnpm run build      # type-check and bundle standalone executables
 pnpm run dev        # run the server directly with tsx
+npm run test:package -- --browser-smoke  # clean npm install + real Chrome + MCP
+npm run release:artifacts              # npm tarball, plugin ZIP, SHA256 sums
+node scripts/plugin-smoke.mjs          # ZIP works without node_modules
 ```
 
 Tests cover login coordination, abandoned locks, error categories, credential-file

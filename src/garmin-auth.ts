@@ -1,7 +1,10 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, chmodSync, renameSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import { ensureBrowser } from "./browser.js";
+import { GarminError, garminFetch, responseError } from "./errors.js";
+import { LoginSession } from "./login-session.js";
 
 /**
  * Garmin Connect's web client authenticates with session cookies plus a
@@ -46,10 +49,6 @@ export class GarminAuth {
     this.configDir = configDir;
     this.authFile = join(this.configDir, "auth.json");
     this.browserProfileDir = join(this.configDir, "browser-profile");
-
-    if (!existsSync(this.configDir)) {
-      mkdirSync(this.configDir, { recursive: true, mode: 0o700 });
-    }
   }
 
   /**
@@ -70,15 +69,13 @@ export class GarminAuth {
 
   /** Cheap authenticated GET used to test whether a session is still live. */
   private async probe(auth: AuthData): Promise<boolean> {
-    try {
-      const res = await fetch(
-        `${GC_API_BASE}/workout-service/workouts?start=1&limit=1`,
-        { headers: garminHeaders(auth), signal: AbortSignal.timeout(15000), redirect: "error" }
-      );
-      return res.ok;
-    } catch {
-      return false;
-    }
+    const res = await garminFetch(
+      `${GC_API_BASE}/workout-service/workouts?start=1&limit=1`,
+      { headers: garminHeaders(auth) }
+    );
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403) return false;
+    throw responseError(res);
   }
 
   /**
@@ -91,6 +88,7 @@ export class GarminAuth {
    * fingerprint, which Garmin uses to block third-party clients.
    */
   async authenticate(): Promise<AuthData | null> {
+    mkdirSync(this.configDir, { recursive: true, mode: 0o700 });
     console.error("🚀 Starting Garmin authentication...");
 
     // A persistent, isolated profile (never the user's personal browser) lets
@@ -114,13 +112,13 @@ export class GarminAuth {
         browser = await puppeteer.launch({
           headless: false,
           userDataDir: this.browserProfileDir,
-          ...(process.env.GARMIN_BROWSER_PATH ? { executablePath: process.env.GARMIN_BROWSER_PATH } : {}),
+          executablePath: await ensureBrowser(),
           args: ["--disable-blink-features=AutomationControlled"],
         });
       } catch (error) {
         // Another server may have launched the shared browser concurrently.
         browser = await reconnect();
-        if (!browser) throw new Error(browserLaunchMessage(error));
+        if (!browser) throw error instanceof GarminError ? error : new GarminError("SETUP_REQUIRED", browserLaunchMessage(error));
       }
     }
 
@@ -213,6 +211,7 @@ export class GarminAuth {
   }
 
   private storeAuth(authData: AuthData): void {
+    mkdirSync(this.configDir, { recursive: true, mode: 0o700 });
     const temporary = `${this.authFile}.${process.pid}.tmp`;
     try {
       writeFileSync(temporary, JSON.stringify(authData, null, 2), { mode: 0o600 });
@@ -223,16 +222,33 @@ export class GarminAuth {
     }
   }
 
-  /** Remove stored credentials. Deletes the file rather than blanking it. */
-  clearAuth(): void {
+  /** Close only the package's isolated browser, then remove local sign-in data. */
+  async logout(): Promise<void> {
+    const session = new LoginSession(this.configDir);
+    const guard = join(this.configDir, "login-claim.lock");
     try {
-      if (existsSync(this.authFile)) {
-        rmSync(this.authFile);
-        console.error("🗑️ Authentication data cleared");
-      }
-    } catch (error) {
-      console.error("Failed to clear auth data:", error);
+      mkdirSync(guard, { mode: 0o700 });
+    } catch {
+      throw new GarminError("LOGIN_BUSY", "Login coordination is busy. Wait for it to finish before disconnecting.");
     }
+    try {
+      if (session.isRunning()) throw new GarminError("LOGIN_BUSY", "A Garmin login is running. Close its login window and wait for the helper to finish, then disconnect again.");
+      let endpoint: string | null = null;
+      try {
+        const [port, path] = readFileSync(join(this.browserProfileDir, "DevToolsActivePort"), "utf8").trim().split("\n");
+        if (/^\d+$/.test(port) && /^\/devtools\/browser\/[a-zA-Z0-9-]+$/.test(path)) endpoint = `ws://127.0.0.1:${port}${path}`;
+      } catch { /* Profile was never launched. */ }
+      if (endpoint) {
+        let browser;
+        try { browser = await puppeteer.connect({ browserWSEndpoint: endpoint, protocolTimeout: 10000 }); }
+        catch { /* Stale DevToolsActivePort from a closed browser. */ }
+        if (browser) {
+          try { await browser.close(); }
+          catch { throw new GarminError("LOGIN_BUSY", "Could not close the dedicated Garmin browser. Close it manually, then disconnect again."); }
+        }
+      }
+      for (const path of [this.authFile, this.browserProfileDir, join(this.configDir, "login-status.json"), join(this.configDir, "login.lock")]) rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } finally { rmSync(guard, { recursive: true, force: true }); }
   }
 }
 
@@ -243,7 +259,7 @@ export function browserLaunchMessage(error: unknown): string {
     return "The Garmin login profile is busy. Close its Google Chrome for Testing window, then run authenticate_garmin again. Your personal browser can stay open.";
   }
   if (/could not find|browser was not found|executable.*(exist|found)|ENOENT/i.test(message)) {
-    return "Chrome is missing. Run `npx puppeteer browsers install chrome` from this package directory, or set GARMIN_BROWSER_PATH to a Chrome/Chromium executable. Safari is not supported by this browser adapter.";
+    return "Chrome is missing. Run setup_garmin with installBrowser=true, or CLI setup --install-browser, or set GARMIN_BROWSER_PATH to a Chrome/Chromium executable.";
   }
   if (/display|X server|platform.*initializ/i.test(message)) {
     return "Garmin browser login needs a local graphical display. Run the package on your desktop rather than a headless server.";

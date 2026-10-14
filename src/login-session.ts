@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 export const configDirectory = () => process.env.GARMIN_CONFIG_DIR || join(homedir(), ".config", "garmin-connect-workouts-mcp");
-export type LoginStatus = { state: "pending" | "success" | "error"; message: string };
+export type LoginStatus = { state: "pending" | "success" | "error"; message: string; code?: string };
 
 /** Shared state contains progress only, never cookies, passwords or tokens. */
 export class LoginSession {
