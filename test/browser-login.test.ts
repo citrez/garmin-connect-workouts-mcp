@@ -3,7 +3,8 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 const adapter = vi.hoisted(() => ({ connect: vi.fn(), launch: vi.fn() }));
-vi.mock("puppeteer", () => ({ default: adapter }));
+vi.mock("puppeteer-core", () => ({ default: adapter }));
+vi.mock("../src/browser.js", () => ({ ensureBrowser: vi.fn(async () => "/test/chrome") }));
 import { GarminAuth } from "../src/garmin-auth.js";
 
 let directory: string;
@@ -56,7 +57,7 @@ describe("interactive browser adapter", () => {
 
   it("waits for authenticated API acceptance rather than accepting a pre-login token", async () => {
     vi.useFakeTimers();
-    const fetch = vi.fn().mockResolvedValueOnce({ ok: false }).mockResolvedValue({ ok: true }); vi.stubGlobal("fetch", fetch);
+    const fetch = vi.fn().mockResolvedValueOnce({ ok: false, status: 401 }).mockResolvedValue({ ok: true }); vi.stubGlobal("fetch", fetch);
     const promise = new GarminAuth(directory).authenticate();
     await vi.advanceTimersByTimeAsync(3000);
     expect(await promise).not.toBeNull(); expect(fetch).toHaveBeenCalledTimes(2);
@@ -69,7 +70,7 @@ describe("interactive browser adapter", () => {
   });
 
   it("reports a bounded timeout when login never succeeds", async () => {
-    vi.useFakeTimers(); vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false })));
+    vi.useFakeTimers(); vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 401 })));
     const assertion = expect(new GarminAuth(directory).authenticate()).rejects.toThrow("Timed out waiting for login");
     await vi.advanceTimersByTimeAsync(300000); await assertion;
     expect(browser.disconnect).toHaveBeenCalled();

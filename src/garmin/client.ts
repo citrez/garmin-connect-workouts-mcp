@@ -1,3 +1,4 @@
+import { GarminError, garminFetch, responseError } from "../errors.js";
 import { GC_API_BASE, garminHeaders, type AuthData } from "../garmin-auth.js";
 import { buildWorkoutPayload } from "../workout/payload.js";
 import type { WorkoutData } from "../workout/types.js";
@@ -7,17 +8,6 @@ export interface WorkoutSummary {
   workoutName: string;
   sportType?: { sportTypeKey: string };
   updatedDate?: string;
-}
-
-export class GarminApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly body?: string
-  ) {
-    super(message);
-    this.name = "GarminApiError";
-  }
 }
 
 export class GarminClient {
@@ -32,33 +22,17 @@ export class GarminClient {
       headers["content-type"] = "application/json";
     }
 
-    const res = await fetch(`${GC_API_BASE}${path}`, {
+    const res = await garminFetch(`${GC_API_BASE}${path}`, {
       method: init.method ?? "GET",
       headers,
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
     });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      // 401 and 403 both mean the session is gone: Garmin answers 403 for a
-      // missing or stale CSRF token, which is the more common expiry mode here.
-      if (res.status === 401 || res.status === 403) {
-        throw new GarminApiError(
-          "Garmin session expired. Please re-authenticate with the 'authenticate_garmin' tool.",
-          res.status,
-          body
-        );
-      }
-      throw new GarminApiError(
-        `Garmin API error ${res.status} ${res.statusText}`,
-        res.status,
-        body
-      );
-    }
+    if (!res.ok) throw responseError(res);
 
     if (res.status === 204) return undefined as T;
     const text = await res.text();
-    return (text ? JSON.parse(text) : undefined) as T;
+    try { return (text ? JSON.parse(text) : undefined) as T; }
+    catch { throw new GarminError("API_ERROR", "Garmin returned an invalid response. Check your account before repeating a write.", res.status); }
   }
 
   async createWorkout(workout: WorkoutData) {
