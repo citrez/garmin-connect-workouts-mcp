@@ -42,7 +42,7 @@ jobs:
           path: release/*
           if-no-files-found: error
       - name: Publish GitHub archives
-        if: startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
