@@ -20,14 +20,18 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      # pnpm 11 needs Node >=22.13; install build dependencies on Node 24.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - uses: pnpm/action-setup@v4
         with:
           version: 11
-      - uses: actions/setup-node@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Select the runtime under test
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
       - run: npm test
       - name: Test a clean packaged install and real Chrome
         run: npm run test:package -- --browser-smoke
@@ -41,3 +45,8 @@ jobs:
           name: garmin-release-candidate
           path: release/*
           if-no-files-found: error
+      - name: Restore the package-manager runtime for cleanup
+        if: always()
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
