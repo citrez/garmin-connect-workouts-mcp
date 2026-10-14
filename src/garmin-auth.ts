@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, chmodSync, renameSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import puppeteer from "puppeteer";
@@ -42,13 +42,13 @@ export class GarminAuth {
   private authFile: string;
   private browserProfileDir: string;
 
-  constructor() {
-    this.configDir = join(homedir(), ".config", "garmin-connect-workouts-mcp");
+  constructor(configDir = process.env.GARMIN_CONFIG_DIR || join(homedir(), ".config", "garmin-connect-workouts-mcp")) {
+    this.configDir = configDir;
     this.authFile = join(this.configDir, "auth.json");
     this.browserProfileDir = join(this.configDir, "browser-profile");
 
     if (!existsSync(this.configDir)) {
-      mkdirSync(this.configDir, { recursive: true });
+      mkdirSync(this.configDir, { recursive: true, mode: 0o700 });
     }
   }
 
@@ -73,7 +73,7 @@ export class GarminAuth {
     try {
       const res = await fetch(
         `${GC_API_BASE}/workout-service/workouts?start=1&limit=1`,
-        { headers: garminHeaders(auth) }
+        { headers: garminHeaders(auth), signal: AbortSignal.timeout(15000), redirect: "error" }
       );
       return res.ok;
     } catch {
@@ -100,36 +100,34 @@ export class GarminAuth {
       mkdirSync(this.browserProfileDir, { recursive: true, mode: 0o700 });
     }
 
-    let browser;
-    try {
-      browser = await puppeteer.launch({
-        headless: false,
-        userDataDir: this.browserProfileDir,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-blink-features=AutomationControlled",
-        ],
-      });
-    } catch (error) {
-      console.error("❌ Failed to launch browser for Garmin login:", error);
-      throw new Error(
-        "No browser available for the Garmin login. Authentication opens a real Chrome window, so it only works where the server runs locally (e.g. `claude mcp add garmin-workouts npx garmin-connect-workouts-mcp`) - hosted or containerized environments cannot run it. If you ARE running locally and see this, install Puppeteer's browser with: npx puppeteer browsers install chrome"
-      );
+    // Reconnect only to this package's isolated profile, never a personal browser.
+    const reconnect = async () => {
+      try {
+        const [port, wsPath] = readFileSync(join(this.browserProfileDir, "DevToolsActivePort"), "utf8").trim().split("\n");
+        if (!/^\d+$/.test(port) || !/^\/devtools\/browser\/[a-zA-Z0-9-]+$/.test(wsPath)) return null;
+        return await puppeteer.connect({ browserWSEndpoint: `ws://127.0.0.1:${port}${wsPath}`, protocolTimeout: 10000 });
+      } catch { return null; }
+    };
+    let browser = await reconnect();
+    if (!browser) {
+      try {
+        browser = await puppeteer.launch({
+          headless: false,
+          userDataDir: this.browserProfileDir,
+          ...(process.env.GARMIN_BROWSER_PATH ? { executablePath: process.env.GARMIN_BROWSER_PATH } : {}),
+          args: ["--disable-blink-features=AutomationControlled"],
+        });
+      } catch (error) {
+        // Another server may have launched the shared browser concurrently.
+        browser = await reconnect();
+        if (!browser) throw new Error(browserLaunchMessage(error));
+      }
     }
 
     let authData: AuthData | null = null;
 
     try {
       const page = await browser.newPage();
-
-      await page.setUserAgent(
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
-      );
-
-      await page.evaluateOnNewDocument(() => {
-        delete (navigator as any).webdriver;
-      });
 
       await page.setViewport({ width: 1366, height: 768 });
 
@@ -139,6 +137,8 @@ export class GarminAuth {
       // so simply loading the workouts list surfaces one. Keep the newest: the
       // token is stable for a session, but a re-login mid-flow rotates it.
       page.on("request", (request) => {
+        const url = new URL(request.url());
+        if (url.origin !== "https://connect.garmin.com" || !url.pathname.startsWith("/gc-api/")) return;
         const token = request.headers()["connect-csrf-token"];
         if (token) {
           if (!csrfToken) {
@@ -152,7 +152,8 @@ export class GarminAuth {
       console.error("👉 Please login manually in the browser");
 
       await page.goto("https://connect.garmin.com/app/workouts", {
-        waitUntil: "networkidle2",
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
       });
 
       console.error("⏳ Waiting for login completion...");
@@ -161,43 +162,34 @@ export class GarminAuth {
       // reworks the workouts page markup regularly, and a stale selector turns
       // a failed login into a silent five-minute hang.
       const deadline = Date.now() + 300000;
+      let candidate: AuthData | null = null;
       while (Date.now() < deadline) {
-        if (csrfToken && !page.url().includes("sso.garmin.com")) {
-          break;
+        if (!browser.connected || page.isClosed()) throw new Error("Login window closed. Run authenticate_garmin to reopen it.");
+        if (csrfToken && new URL(page.url()).origin === "https://connect.garmin.com") {
+          const pageCookies = (await browser.cookies()).filter(cookie => {
+            const domain = cookie.domain.replace(/^\./, "");
+            return (domain === "connect.garmin.com" || "connect.garmin.com".endsWith(`.${domain}`))
+              && "/gc-api/".startsWith(cookie.path);
+          });
+          const captured = {
+            cookies: pageCookies.map(c => `${c.name}=${c.value}`).join("; "),
+            csrfToken,
+            capturedAt: Date.now(),
+          };
+          // A pre-login CSRF token is not proof of authentication. Keep waiting
+          // through redirects/MFA until the API accepts the captured session.
+          if (captured.cookies && await this.probe(captured)) { candidate = captured; break; }
         }
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
-
-      if (!csrfToken) {
-        throw new Error(
-          "Timed out waiting for login (no CSRF token captured after 5 minutes)."
-        );
-      }
-
-      const pageCookies = await page.cookies();
-      const cookies = pageCookies.map((c) => `${c.name}=${c.value}`).join("; ");
-
-      const candidate: AuthData = {
-        cookies,
-        csrfToken,
-        capturedAt: Date.now(),
-      };
-
-      // Verify before storing. Capturing a token proves the browser talked to
-      // Garmin; it does not prove the credentials work outside the browser.
-      if (!(await this.probe(candidate))) {
-        throw new Error(
-          "Captured a session but it was rejected by the API. Please try again."
-        );
-      }
+      if (!candidate) throw new Error("Timed out waiting for login after 5 minutes. Run authenticate_garmin to resume sign-in in the same browser.");
 
       console.error("✅ Authentication successful!");
       this.storeAuth(candidate);
       authData = candidate;
-    } catch (error) {
-      console.error("❌ Authentication failed:", error);
     } finally {
-      await browser.close();
+      // Keep the dedicated browser reusable after a client timeout/restart.
+      await browser.disconnect();
     }
 
     return authData;
@@ -209,24 +201,25 @@ export class GarminAuth {
         return null;
       }
       const parsed = JSON.parse(readFileSync(this.authFile, "utf8"));
-      if (!parsed?.cookies || !parsed?.csrfToken) {
+      if (typeof parsed?.cookies !== "string" || !parsed.cookies || typeof parsed?.csrfToken !== "string" || !parsed.csrfToken || !Number.isFinite(parsed?.capturedAt)) {
         return null;
       }
       return parsed as AuthData;
-    } catch (error) {
-      console.error("Failed to load stored auth:", error);
+    } catch {
+      // JSON parser errors can contain excerpts of the credential file.
+      console.error("Stored Garmin session could not be read. Re-authenticate to replace it.");
       return null;
     }
   }
 
   private storeAuth(authData: AuthData): void {
+    const temporary = `${this.authFile}.${process.pid}.tmp`;
     try {
-      writeFileSync(this.authFile, JSON.stringify(authData, null, 2), {
-        mode: 0o600,
-      });
-      console.error("💾 Authentication data stored securely");
-    } catch (error) {
-      console.error("Failed to store auth data:", error);
+      writeFileSync(temporary, JSON.stringify(authData, null, 2), { mode: 0o600 });
+      chmodSync(temporary, 0o600);
+      renameSync(temporary, this.authFile);
+    } finally {
+      rmSync(temporary, { force: true });
     }
   }
 
@@ -241,4 +234,19 @@ export class GarminAuth {
       console.error("Failed to clear auth data:", error);
     }
   }
+}
+
+/** Actionable categories; do not return raw browser logs or credential-bearing URLs. */
+export function browserLaunchMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/already running|SingletonLock|ProcessSingleton/i.test(message)) {
+    return "The Garmin login profile is busy. Close its Google Chrome for Testing window, then run authenticate_garmin again. Your personal browser can stay open.";
+  }
+  if (/could not find|browser was not found|executable.*(exist|found)|ENOENT/i.test(message)) {
+    return "Chrome is missing. Run `npx puppeteer browsers install chrome` from this package directory, or set GARMIN_BROWSER_PATH to a Chrome/Chromium executable. Safari is not supported by this browser adapter.";
+  }
+  if (/display|X server|platform.*initializ/i.test(message)) {
+    return "Garmin browser login needs a local graphical display. Run the package on your desktop rather than a headless server.";
+  }
+  return "Could not open the Garmin login browser. Check GARMIN_BROWSER_PATH and whether the dedicated login browser can start on this desktop.";
 }

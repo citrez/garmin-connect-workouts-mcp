@@ -3,16 +3,18 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { LoginSession } from "./login-session.js";
 import { GarminAuth } from "./garmin-auth.js";
 import { GarminClient } from "./garmin/client.js";
 import { sportSchema, stepSchema, workoutDataSchema, type WorkoutData } from "./workout/types.js";
 
 const server = new McpServer(
-  { name: "garmin-connect-workouts", version: "1.1.3" },
+  { name: "garmin-connect-workouts", version: "1.2.0" },
   { capabilities: { tools: {} } }
 );
 
 const garminAuth = new GarminAuth();
+const loginSession = new LoginSession();
 
 const NEEDS_AUTH =
   "❌ Not authenticated with Garmin Connect. Run the 'authenticate_garmin' tool - it opens a browser for a normal Garmin login.";
@@ -202,16 +204,14 @@ server.registerTool(
   "check_garmin_auth",
   {
     description:
-      "Probe whether the stored Garmin Connect session is still valid, using a cheap authenticated request rather than a local expiry check (Garmin's session cookie does not carry a reliable expiry). Use this first when unsure whether the other tools will work. Returns a message telling you to run authenticate_garmin if the session is missing or has expired; never throws.",
+      "Probe whether the stored Garmin Connect session is still valid, using a cheap authenticated request rather than a local expiry check (Garmin's session cookie does not carry a reliable expiry). Use this first when unsure whether the other tools will work. Reports pending login, specific login failures, or an expired/missing session. Never returns cookies or tokens.",
     annotations: { title: "Check Garmin auth", readOnlyHint: true, idempotentHint: true },
   },
   safe(async () => {
     const auth = await garminAuth.getValidAuth();
-    return text(
-      auth
-        ? `✅ Garmin session is valid (captured ${new Date(auth.capturedAt).toLocaleString()}).`
-        : NEEDS_AUTH
-    );
+    if (auth) return text(`✅ Garmin session is valid (captured ${new Date(auth.capturedAt).toLocaleString()}).`);
+    const status = loginSession.read();
+    return text(status && status.state !== "success" ? status.message : NEEDS_AUTH);
   })
 );
 
@@ -219,16 +219,13 @@ server.registerTool(
   "authenticate_garmin",
   {
     description:
-      "Authenticate with Garmin Connect by opening a real browser window at connect.garmin.com for you to log in normally, then capture and store only the resulting session cookies and CSRF token (never your password). Run this whenever check_garmin_auth reports no valid session, or any other tool returns its 'not authenticated' message. Requires a local display; will not work in a headless-only environment.",
+      "Start or resume Garmin sign-in in a dedicated Chrome window. Returns immediately while a separate local helper completes login. The same browser is reused across MCP restarts. Sign in and complete MFA in the browser, then call check_garmin_auth for completion or actionable errors. Never enter credentials in chat. Requires a local graphical display.",
     annotations: { title: "Authenticate with Garmin" },
   },
   safe(async () => {
-    const auth = await garminAuth.authenticate();
-    return text(
-      auth
-        ? "✅ Authenticated with Garmin Connect. You can now create workouts."
-        : "❌ Authentication failed. Make sure you can reach Garmin Connect in a browser."
-    );
+    const auth = await garminAuth.getValidAuth();
+    if (auth) return text("✅ Already authenticated with Garmin Connect.");
+    return text(loginSession.start().message);
   })
 );
 
