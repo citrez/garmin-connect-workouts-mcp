@@ -3,12 +3,14 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { Worker } from "node:worker_threads";
 
 export const configDirectory = () => process.env.GARMIN_CONFIG_DIR || join(homedir(), ".config", "garmin-connect-workouts-mcp");
 export type LoginStatus = { state: "pending" | "success" | "error"; message: string; code?: string };
 
 /** Shared state contains progress only, never cookies, passwords or tokens. */
 export class LoginSession {
+  private backgroundWorker?: Worker;
   private lock: string;
   private statusFile: string;
   constructor(private directory = configDirectory()) {
@@ -18,6 +20,7 @@ export class LoginSession {
   }
 
   isRunning(): boolean {
+    if (this.backgroundWorker) return true;
     try {
       const { pid } = JSON.parse(readFileSync(join(this.lock, "owner.json"), "utf8"));
       if (!Number.isSafeInteger(pid) || pid <= 0) return true;
@@ -85,6 +88,7 @@ export class LoginSession {
   }
 
   start(options: { installBrowser?: boolean } = {}): LoginStatus {
+    if (this.backgroundWorker) return { state: "pending", message: "Garmin sign-in is being prepared. Run check_garmin_auth for progress; do not assume the browser has opened yet." };
     if (this.isRunning()) return this.read()!;
     // A detached helper survives MCP request timeouts and client restarts.
     const worker = fileURLToPath(new URL("./login-worker.js", import.meta.url));
@@ -93,9 +97,38 @@ export class LoginSession {
       this.write(status);
       return status;
     }
-    const child = spawn(process.execPath, [worker], { detached: true, stdio: "ignore", env: { ...process.env, GARMIN_CONFIG_DIR: this.directory, GARMIN_INSTALL_BROWSER: options.installBrowser ? "1" : "0" } });
-    child.on("error", () => this.write({ state: "error", message: "Could not start the login helper. Build the package with pnpm run build and retry." }));
+    const env = { ...process.env, GARMIN_CONFIG_DIR: this.directory, GARMIN_INSTALL_BROWSER: options.installBrowser ? "1" : "0" };
+    // Electron utility executables are not standalone Node CLIs. Use the host's
+    // existing Node runtime instead of relaunching its executable with a JS file.
+    if (process.versions.electron) {
+      try {
+        this.write({ state: "pending", message: "Preparing Garmin sign-in. Run check_garmin_auth for progress before assuming the browser is open." });
+        const background = new Worker(new URL("./login-worker.js", import.meta.url), { env, execArgv: [], stdout: true, stderr: true });
+        this.backgroundWorker = background;
+        background.stdout.resume();
+        background.stderr.resume();
+        background.on("error", () => {
+          this.write({ state: "error", code: "LOGIN_HELPER_FAILED", message: "The Garmin sign-in worker could not run. Restart the Garmin extension and retry; check doctor_garmin if it fails again." });
+          this.release();
+        });
+        background.on("exit", code => {
+          this.backgroundWorker = undefined;
+          if (code !== 0) {
+            this.write({ state: "error", code: "LOGIN_HELPER_FAILED", message: "The Garmin sign-in worker stopped unexpectedly. Restart the Garmin extension and retry." });
+            this.release();
+          }
+        });
+        background.unref();
+      } catch {
+        const status: LoginStatus = { state: "error", code: "LOGIN_HELPER_FAILED", message: "Could not start the Garmin sign-in worker. Restart the Garmin extension and retry." };
+        this.write(status);
+        return status;
+      }
+      return { state: "pending", message: "Garmin sign-in is being prepared in the desktop extension. Run check_garmin_auth for progress or errors before telling the user the browser is open. Keep the extension running during sign-in." };
+    }
+    const child = spawn(process.execPath, [worker], { detached: true, stdio: "ignore", env });
+    child.on("error", () => this.write({ state: "error", code: "LOGIN_HELPER_FAILED", message: "Could not start the Garmin sign-in helper. Run doctor_garmin, then restart the extension and retry." }));
     child.unref();
-    return { state: "pending", message: "Login helper started. A dedicated Chrome window will open or be reused. Sign in there, then run check_garmin_auth for progress or a specific error. No password should be entered in chat." };
+    return { state: "pending", message: "Garmin sign-in is being prepared. Run check_garmin_auth for progress or errors before telling the user the browser is open. No password should be entered in chat." };
   }
 }

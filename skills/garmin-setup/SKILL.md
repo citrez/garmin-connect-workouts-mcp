@@ -3,9 +3,9 @@ name: garmin-setup
 description: Connect a local Garmin account, diagnose setup, or disconnect it using the Garmin Workouts MCP tools.
 ---
 
-When the user asks to connect, call `connect_garmin` once. It checks an existing session and starts a detached helper that prepares Chrome and opens sign-in. It defaults to downloading official Chrome for Testing if no browser is available; the user's request to set up Garmin covers this prerequisite. Set `installBrowser=false` if they do not want a download.
+When the user asks to connect, call `connect_garmin` once. It checks an existing session and starts a background helper that prepares Chrome and opens sign-in. It defaults to downloading official Chrome for Testing if no browser is available; the user's request to set up Garmin covers this prerequisite. Set `installBrowser=false` if they do not want a download.
 
-Tell the user to sign in and complete MFA in the dedicated browser, never in chat. Use `check_garmin_auth` for progress; the helper may still be downloading Chrome. Do not repeatedly start login while pending. Once the session is valid, setup is complete; do not create a sample workout unless asked.
+Tell the user to sign in and complete MFA in the dedicated browser, never in chat. Call `check_garmin_auth` immediately after starting setup to check for launch errors before saying the browser has opened. Use it again for progress; the helper may still be downloading Chrome. Do not repeatedly start login while pending. Keep Claude and the extension running during sign-in; its embedded runtime uses a worker thread. Once the session is valid, setup is complete; do not create a sample workout unless asked.
 
 Use `doctor_garmin` to diagnose setup failures. An invalid `GARMIN_BROWSER_PATH` must be corrected rather than silently ignored. Sign-in needs a graphical desktop. Use `setup_garmin` and `authenticate_garmin` separately only when diagnosing a specific stage.
 
