@@ -34,12 +34,12 @@ local graphical desktop. This is a desktop integration, not a hosted MCP service
 
 ### Easiest desktop installation
 
-- **Claude Desktop:** download `garmin-workouts-1.4.0.mcpb` from the
-  [release](https://github.com/citrez/garmin-connect-workouts-mcp/releases/tag/v1.4.0),
+- **Claude Desktop:** download `garmin-workouts-1.4.1.mcpb` from the
+  [release](https://github.com/citrez/garmin-connect-workouts-mcp/releases/tag/v1.4.1),
   install it under Settings → Extensions, then say **Connect my Garmin**.
   No terminal, npm install, API key or JSON editing is needed. The extension declares
   a bundled host Node runtime requirement of >=22.12.0.
-- **ChatGPT Work / Codex desktop:** extract `garmin-workouts-plugin-1.4.0.zip`,
+- **ChatGPT Work / Codex desktop:** extract `garmin-workouts-plugin-1.4.1.zip`,
   open the macOS/Windows launcher in `installers`, restart the app and install
   Garmin Workouts from your personal marketplace. Then say **Connect my Garmin**.
   This route requires Node >=22.12.0 on the computer.
@@ -49,7 +49,7 @@ local graphical desktop. This is a desktop integration, not a hosted MCP service
 ### npm
 
 ```bash
-npm install --global @citrez/garmin-connect-workouts-mcp@1.4.0
+npm install --global @citrez/garmin-connect-workouts-mcp@1.4.1
 ```
 
 Register the ChatGPT/Codex plugin without editing JSON:
@@ -68,7 +68,7 @@ Download/install the versioned release; no clone, pnpm, compilation, or browser
 postinstall script is required:
 
 ```bash
-npm install --global https://github.com/citrez/garmin-connect-workouts-mcp/releases/download/v1.4.0/citrez-garmin-connect-workouts-mcp-1.4.0.tgz
+npm install --global https://github.com/citrez/garmin-connect-workouts-mcp/releases/download/v1.4.1/citrez-garmin-connect-workouts-mcp-1.4.1.tgz
 garmin-connect-workouts-mcp doctor
 garmin-connect-workouts-mcp setup --install-browser
 garmin-connect-workouts-mcp login
@@ -109,7 +109,7 @@ For custom marketplace layouts, see [manual distribution](docs/distribution.md).
 
 ### Run through npx
 
-Version 1.4.0 is available on [npm](https://www.npmjs.com/package/@citrez/garmin-connect-workouts-mcp).
+Version 1.4.1 is available on [npm](https://www.npmjs.com/package/@citrez/garmin-connect-workouts-mcp).
 To run without installing the executable globally, configure clients with:
 
 ```json
@@ -117,7 +117,7 @@ To run without installing the executable globally, configure clients with:
   "mcpServers": {
     "garmin-workouts": {
       "command": "npx",
-      "args": ["--yes", "@citrez/garmin-connect-workouts-mcp@1.4.0"]
+      "args": ["--yes", "@citrez/garmin-connect-workouts-mcp@1.4.1"]
     }
   }
 }
@@ -130,8 +130,9 @@ For normal onboarding, call **`connect_garmin`** once and check progress with
 Use the individual setup/authentication tools below when diagnosing a specific stage.
 
 1. Run `doctor_garmin`; if Chrome is missing, run `setup_garmin` with
-   `installBrowser=true`. Then run `authenticate_garmin`. It returns promptly and starts a separate local
-   login helper, which survives MCP request timeouts and client restarts.
+   `installBrowser=true`. Then run `authenticate_garmin`. It returns promptly and starts a background
+   login helper, which survives MCP request timeouts. In Claude’s embedded runtime,
+   keep the extension running during sign-in; standalone Node uses a detached process.
 2. Sign in and complete MFA directly in the dedicated Chrome window.
 3. Run `check_garmin_auth` to see progress, completion, or an actionable error.
    Do not keep calling `authenticate_garmin` while login is pending.

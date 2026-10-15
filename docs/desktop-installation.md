@@ -2,8 +2,8 @@
 
 ## Claude Desktop: no terminal setup
 
-1. Download **garmin-workouts-1.4.0.mcpb** from the
-   [1.4.0 release](https://github.com/citrez/garmin-connect-workouts-mcp/releases/tag/v1.4.0).
+1. Download **garmin-workouts-1.4.1.mcpb** from the
+   [1.4.1 release](https://github.com/citrez/garmin-connect-workouts-mcp/releases/tag/v1.4.1).
 2. Open Claude Desktop → Settings → Extensions → Advanced settings → Install Extension,
    select the `.mcpb` file, and review/accept its installation prompt. On supported
    versions, opening the downloaded `.mcpb` file directly also opens the installer.
@@ -25,7 +25,7 @@ not in the conversation. Nothing is created in Garmin just by connecting.
 
 ## ChatGPT Work / Codex desktop
 
-1. Download and extract **garmin-workouts-plugin-1.4.0.zip** from the same release.
+1. Download and extract **garmin-workouts-plugin-1.4.1.zip** from the same release.
 2. Open the `installers` folder in the extracted package:
    - macOS: open `Install-Garmin-Workouts.command`.
    - Windows: open `Install-Garmin-Workouts.cmd`.
@@ -42,11 +42,11 @@ system protections; the npm command below is an alternative.
 If you already use npm, run just:
 
 ```bash
-npx --yes @citrez/garmin-connect-workouts-mcp@1.4.0 install-plugin
+npx --yes @citrez/garmin-connect-workouts-mcp@1.4.1 install-plugin
 ```
 
 The installer copies the plugin to an immutable version folder under
-`~/.codex/plugins/garmin-workouts/1.4.0` and adds its entry to
+`~/.codex/plugins/garmin-workouts/1.4.1` and adds its entry to
 `~/.agents/plugins/marketplace.json`. Existing plugins, marketplace names and
 explicit install policies are preserved. Changes to an existing marketplace are
 backed up beside the original file. It refuses malformed JSON, conflicting plugin
@@ -60,7 +60,7 @@ Users with custom marketplace layouts can follow [manual distribution instructio
 The npm executable and existing stdio configurations remain supported:
 
 ```bash
-npm install --global @citrez/garmin-connect-workouts-mcp@1.4.0
+npm install --global @citrez/garmin-connect-workouts-mcp@1.4.1
 ```
 
 Then call `connect_garmin` through your client. Alternatively run

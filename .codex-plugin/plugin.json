@@ -1,6 +1,6 @@
 {
   "name": "garmin-workouts",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Create structured Garmin workouts from training descriptions.",
   "skills": "./skills/",
   "mcpServers": "./mcp.json",

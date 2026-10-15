@@ -22,28 +22,34 @@ try {
   assert.equal(manifest.version, version); assert.equal(hasRequiredConfigMissing({ manifest }), false);
   const config = await getMcpConfigForManifest({ manifest, extensionPath: root, systemDirs: { HOME: root }, userConfig: {}, pathSeparator: sep });
   assert(config); assert(!config.args.some(arg => arg.includes('${')));
-  const client = new Client({ name: 'claude-extension-smoke', version: '1.0.0' });
-  const env = { ...process.env, ...config.env, GARMIN_CONFIG_DIR: join(root, 'session'), GARMIN_BROWSER_PATH: join(root, 'missing-chrome') };
-  try {
-    // The host substitutes its Node runtime for the manifest's "node" command.
-    await client.connect(new StdioClientTransport({ command: process.execPath, args: config.args, env, cwd: root, stderr: 'pipe' }));
-    assert(client.getInstructions().includes('connect_garmin'));
-    const tools = (await client.listTools()).tools;
-    assert.deepEqual(tools.map(tool => tool.name).sort(), manifest.tools.map(tool => tool.name).sort());
-    assert.equal(tools.length, 12);
-    assert.deepEqual((await client.listPrompts()).prompts.map(prompt => prompt.name), ['garmin_setup']);
-    const prompt = await client.getPrompt({ name: 'garmin_setup' }); assert(prompt.messages[0].content.text.includes('connect_garmin'));
-    const connected = await client.callTool({ name: 'connect_garmin', arguments: { installBrowser: false } });
-    assert.equal(connected.structuredContent.state, 'pending');
-    let progress;
-    for (let i = 0; i < 50; i++) {
-      await new Promise(resolve => setTimeout(resolve, 200));
-      progress = await client.callTool({ name: 'check_garmin_auth', arguments: {} });
-      if (progress.structuredContent.code === 'SETUP_REQUIRED') break;
-    }
-    assert.equal(progress.structuredContent.code, 'SETUP_REQUIRED');
-    assert.equal((await client.callTool({ name: 'disconnect_garmin', arguments: {} })).structuredContent.ok, true);
-  } finally { await client.close(); }
+  // Exercise both a standalone Node host and an embedded host whose executable
+  // cannot be relaunched as Node. The latter caught the Claude UtilityProcess bug.
+  const embeddedPrelude = join(root, 'embedded-host.mjs');
+  writeFileSync(embeddedPrelude, `Object.defineProperty(process.versions, 'electron', {value: 'test'}); Object.defineProperty(process, 'execPath', {value: ${JSON.stringify(join(root, 'not-a-node-cli'))}});`);
+  for (const embedded of [false, true]) {
+    const client = new Client({ name: 'claude-extension-smoke', version: '1.0.0' });
+    const env = { ...process.env, ...config.env, GARMIN_CONFIG_DIR: join(root, embedded ? 'embedded-session' : 'session'), GARMIN_BROWSER_PATH: join(root, 'missing-chrome') };
+    try {
+      // The host substitutes its Node runtime for the manifest's "node" command.
+      await client.connect(new StdioClientTransport({ command: process.execPath, args: [...(embedded ? ['--import', pathToFileURL(embeddedPrelude).href] : []), ...config.args], env, cwd: root, stderr: 'pipe' }));
+      assert(client.getInstructions().includes('connect_garmin'));
+      const tools = (await client.listTools()).tools;
+      assert.deepEqual(tools.map(tool => tool.name).sort(), manifest.tools.map(tool => tool.name).sort());
+      assert.equal(tools.length, 12);
+      assert.deepEqual((await client.listPrompts()).prompts.map(prompt => prompt.name), ['garmin_setup']);
+      const prompt = await client.getPrompt({ name: 'garmin_setup' }); assert(prompt.messages[0].content.text.includes('connect_garmin'));
+      const connected = await client.callTool({ name: 'connect_garmin', arguments: { installBrowser: false } });
+      assert.equal(connected.structuredContent.state, 'pending');
+      let progress;
+      for (let i = 0; i < 50; i++) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        progress = await client.callTool({ name: 'check_garmin_auth', arguments: {} });
+        if (progress.structuredContent.code === 'SETUP_REQUIRED') break;
+      }
+      assert.equal(progress.structuredContent.code, 'SETUP_REQUIRED');
+      assert.equal((await client.callTool({ name: 'disconnect_garmin', arguments: {} })).structuredContent.ok, true);
+    } finally { await client.close(); }
+  }
   const pluginRoot = join(root, 'plugin files with spaces'); mkdirSync(pluginRoot);
   const pluginFiles = unzipSync(readFileSync(`release/garmin-workouts-plugin-${version}.zip`));
   for (const [path, bytes] of Object.entries(pluginFiles)) {
@@ -63,5 +69,5 @@ try {
     ? execFileSync('cmd.exe', ['/d', '/s', '/c', `""${launcher}" --check"`], { windowsVerbatimArguments: true, encoding: 'utf8' })
     : execFileSync('bash', [launcher, '--check'], { encoding: 'utf8' });
   assert.equal(output.trim(), version);
-  console.log(`Claude MCPB: schema, host configuration, tools, setup prompt and detached helper pass on Node ${process.versions.node} (${process.platform}).`);
+  console.log(`Claude MCPB: schema, tools, setup prompt, standalone helper and embedded-runtime worker pass on Node ${process.versions.node} (${process.platform}).`);
 } finally { rmSync(root, { recursive: true, force: true }); }

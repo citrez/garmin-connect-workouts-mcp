@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "garmin-workouts",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Create structured Garmin workouts from natural-language training sessions.",
   "author": {
     "name": "citrez",

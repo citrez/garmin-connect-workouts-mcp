@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "garmin-workouts",
   "display_name": "Garmin Workouts",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Describe a training session and create it in your own Garmin Connect account.",
   "long_description": "Install this extension, then say Connect my Garmin. The extension detects Chrome or downloads Chrome for Testing when needed, opens a dedicated Garmin sign-in window, and supports MFA. Passwords stay on Garmin's website. Create, inspect, update, delete and schedule running, cycling and swimming workouts. No terminal commands, API keys or JSON configuration are required. A graphical desktop is required for browser sign-in. This is an unofficial integration and is not affiliated with Garmin.",
   "author": { "name": "citrez", "url": "https://github.com/citrez" },

@@ -1,11 +1,5 @@
-Install Garmin Workouts as a native Claude Desktop extension or a ChatGPT/Codex plugin, then say **Connect my Garmin**.
+Fix Garmin sign-in in Claude Desktop’s embedded Node runtime. The extension now runs setup in a background worker instead of trying to launch the Electron host as a Node executable. No separate Node installation is needed. Keep Claude and the extension running while completing sign-in.
 
-- New `.mcpb` extension: server/dependencies included, zero required configuration; Claude supplies a compatible Node runtime (>=22.12.0).
-- ChatGPT/Codex ZIP includes macOS and Windows registration launchers; the installer preserves existing plugins and backs up marketplace changes.
-- One-step connection prepares Chrome in a detached helper and opens Garmin sign-in, including MFA. No sample workout is created during setup.
-- MCP setup prompt and server guidance make onboarding discoverable in Claude and other clients.
-- Official MCPB schema, host config expansion, protocol/helper, extracted package and launcher checks run across the desktop CI matrix.
+Connection guidance now checks progress before claiming the browser has opened. A packaged regression check covers an embedded host whose executable cannot be relaunched.
 
-Download `garmin-workouts-1.4.0.mcpb` for Claude Desktop, or the plugin ZIP for ChatGPT Work/Codex desktop. See `docs/desktop-installation.md`. Existing npm/stdio installs remain supported. ChatGPT/Codex installation requires Node >=22.12.0; the native Claude extension declares that minimum for its bundled host runtime.
-
-This is an unofficial Garmin integration. Public directory listings require separate submission/review. Web/mobile hosting is not deployed; Garmin Developer Program approval and a selected host are prerequisites.
+Download `garmin-workouts-1.4.1.mcpb` for Claude Desktop or `garmin-workouts-plugin-1.4.1.zip` for ChatGPT/Codex. This is an unofficial Garmin integration.

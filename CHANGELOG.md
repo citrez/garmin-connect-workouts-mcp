@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.1
+
+- Fix Garmin sign-in in Claude’s embedded Node runtime by using a worker thread instead of relaunching the Electron executable. No separate Node installation is required.
+- Report helper launch failures without misleading build instructions, and require a progress check before claiming the browser opened.
+- Add a packaged regression check with a non-relaunchable embedded host executable. Keep Claude running during sign-in; standalone Node retains its detached helper.
+
 ## 1.4.0
 
 - Native Claude `.mcpb` extension with a declared host runtime minimum, setup prompt and zero required configuration.
