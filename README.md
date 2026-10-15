@@ -32,6 +32,17 @@ directly in your account.
 Requires **Node >=22.12.0** on macOS, Windows, or Linux. Garmin sign-in needs a
 local graphical desktop. This is a desktop integration, not a hosted MCP service.
 
+### npm (recommended)
+
+```bash
+npm install --global @citrez/garmin-connect-workouts-mcp@1.3.0
+garmin-connect-workouts-mcp setup --install-browser
+garmin-connect-workouts-mcp login
+```
+
+Then configure your MCP client as shown below. Every user signs into their own
+Garmin account; no source checkout or compilation is required.
+
 ### Prebuilt GitHub package
 
 Download/install the versioned release; no clone, pnpm, compilation, or browser
@@ -84,11 +95,10 @@ Alternatively add it to your personal marketplace; see [plugin installation](doc
 The plugin runs locally and requires Node. Installing it does not share the
 publisher's Garmin account: every user signs into their own account.
 
-### npm registry (after publication)
+### Run through npx
 
-The package identity is `@citrez/garmin-connect-workouts-mcp`. Registry publication
-is a separate maintainer step; the GitHub archives can be distributed independently.
-Once 1.3.0 is published, clients can use:
+Version 1.3.0 is available on [npm](https://www.npmjs.com/package/@citrez/garmin-connect-workouts-mcp).
+To run without installing the executable globally, configure clients with:
 
 ```json
 {

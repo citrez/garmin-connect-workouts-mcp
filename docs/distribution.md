@@ -36,7 +36,7 @@ Workouts, and run setup. The plugin directory includes portable `plugin.json`
 and `mcp.json`, plus a legacy `.codex-plugin/plugin.json`. Its paths are relative
 to the plugin root, not the author's computer. No lifecycle hooks are required.
 
-After npm publication, the local marketplace entry can instead use
+The published npm package can also be used as a local marketplace source:
 `{"source":"npm","package":"@citrez/garmin-connect-workouts-mcp","version":"1.3.0"}`.
 Do not use a Git repository as a plugin source unless it includes the built bundle:
 source checkouts require a build and Codex does not run lifecycle scripts on install.
