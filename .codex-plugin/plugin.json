@@ -1,9 +1,13 @@
 {
   "name": "garmin-workouts",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Create structured Garmin workouts from training descriptions.",
   "skills": "./skills/",
   "mcpServers": "./mcp.json",
   "requires_local_executor": true,
-  "extensions": { "com.openai": { "onboardingSkill": "./skills/garmin-setup/SKILL.md" } }
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/garmin-setup/SKILL.md"
+    }
+  }
 }

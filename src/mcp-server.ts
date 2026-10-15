@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { connectGarmin, SERVER_INSTRUCTIONS } from "./onboarding.js";
 import { doctor, setup } from "./doctor.js";
 import { GarminError } from "./errors.js";
 import { VERSION } from "./version.js";
@@ -13,7 +14,7 @@ import { sportSchema, stepSchema, workoutDataSchema, type WorkoutData } from "./
 
 const server = new McpServer(
   { name: "garmin-connect-workouts", version: VERSION },
-  { capabilities: { tools: {} } }
+  { capabilities: { tools: {}, prompts: {} }, instructions: SERVER_INSTRUCTIONS }
 );
 
 const garminAuth = new GarminAuth();
@@ -74,6 +75,20 @@ function safe<Args extends any[]>(
     }
   };
 }
+
+server.registerTool("connect_garmin", {
+  description: "Connect your Garmin account with one setup action. Detects Chrome, optionally downloads official Chrome for Testing if missing, and opens Garmin sign-in in a dedicated browser. Returns promptly while setup runs in the background. User completes passwords/MFA in the browser. Use check_garmin_auth for progress. Does not create workouts.",
+  inputSchema: { installBrowser: z.boolean().default(true).describe("Allow downloading Chrome for Testing if no browser is installed. Defaults to true for requested setup.") },
+  outputSchema: resultSchema,
+  annotations: { title: "Connect Garmin", destructiveHint: false },
+}, safe(async ({ installBrowser }) => {
+  const status = await connectGarmin(installBrowser, garminAuth, loginSession);
+  return text(status.message, undefined, status.state === "pending" ? "pending" : status.state === "error" ? "error" : "success", status.code);
+}));
+
+server.registerPrompt("garmin_setup", { description: "Connect your Garmin account and verify it is ready for workouts." }, async () => ({
+  messages: [{ role: "user", content: { type: "text", text: "Connect my Garmin account using connect_garmin, then check_garmin_auth. I will complete sign-in and MFA directly in Garmin's browser window. Once connected, tell me I can describe my workout." } }],
+}));
 
 server.registerTool(
   "create_garmin_workout",

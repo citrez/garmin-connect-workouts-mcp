@@ -26,7 +26,7 @@ try {
   const client = new Client({ name: 'plugin-zip-smoke', version: '1.0.0' });
   try {
     await client.connect(new StdioClientTransport({ command: process.execPath, args, cwd: root, env, stderr: 'pipe' }));
-    assert.equal((await client.listTools()).tools.length, 11);
+    assert.equal((await client.listTools()).tools.length, 12);
     const result = await client.callTool({ name: 'check_garmin_auth', arguments: {} });
     assert.equal(result.structuredContent.code, 'AUTH_REQUIRED');
   } finally { await client.close(); }

@@ -3,7 +3,7 @@
 ## Shareable artifacts
 
 `npm run release:artifacts` builds a self-contained npm tarball, a standalone Codex
-plugin ZIP, and `SHA256SUMS` under `release/`. Compiled CLI, MCP server and detached
+plugin ZIP, a native Claude `.mcpb` extension, and `SHA256SUMS` under `release/`. Compiled CLI, MCP server and detached
 login helper bundle their runtime dependencies. The package needs Node >=22.12.0;
 it does not need runtime npm dependencies or install scripts. Third-party license
 notices are included under `dist/THIRD_PARTY_NOTICES.txt`.
@@ -12,6 +12,13 @@ Browser provisioning is explicit at setup time. Every user signs in locally;
 credentials, browser profiles, personal workout fixtures and environment files
 are excluded from the archives. macOS and Linux use owner-only credential files;
 Windows users should retain the private ACLs of their user directory.
+
+## Desktop installers
+
+Use [desktop installation](desktop-installation.md) for the native Claude extension
+and the macOS/Windows ChatGPT/Codex registration launchers. Their connection flow
+is conversational: **Connect my Garmin**. Public directory submission requirements
+and prepared listing copy are in [directory submissions](directory-submissions.md).
 
 ## Personal Codex marketplace
 
@@ -37,18 +44,19 @@ and `mcp.json`, plus a legacy `.codex-plugin/plugin.json`. Its paths are relativ
 to the plugin root, not the author's computer. No lifecycle hooks are required.
 
 The published npm package can also be used as a local marketplace source:
-`{"source":"npm","package":"@citrez/garmin-connect-workouts-mcp","version":"1.3.0"}`.
+`{"source":"npm","package":"@citrez/garmin-connect-workouts-mcp","version":"1.4.0"}`.
 Do not use a Git repository as a plugin source unless it includes the built bundle:
 source checkouts require a build and Codex does not run lifecycle scripts on install.
 
 ## Release procedure
 
 1. Update `package.json`, `server.json` (including its package version),
-   `plugin.json`, `.codex-plugin/plugin.json`, README links, and release notes.
+   `plugin.json`, `.codex-plugin/plugin.json`, `manifest.json`, README links, and release notes.
    Build generates the server version from package metadata and refuses type errors.
 2. Open a PR. CI tests macOS, Windows and Linux with Node 22.12.0 and 24. Each job
    tests encoders, browser/login lifecycle, clean package installation, stdio MCP,
-   a real headless Chrome page, and a standalone plugin ZIP. Interactive Garmin
+   a real headless Chrome page, a standalone plugin ZIP, the official MCPB schema,
+   host configuration, setup prompt and native launcher paths. Interactive Garmin
    sign-in/MFA remains a manual acceptance check; CI has no Garmin credentials.
 3. After all matrix jobs pass, merge and tag the commit `v<version>`. Pushing the
    tag runs `release.yml`, repeats validation, and publishes GitHub archives.

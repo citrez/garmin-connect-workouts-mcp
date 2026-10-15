@@ -1,3 +1,4 @@
+import { prepareConnection } from "./onboarding.js";
 import { GarminAuth } from "./garmin-auth.js";
 import { GarminError } from "./errors.js";
 import { LoginSession } from "./login-session.js";
@@ -6,6 +7,11 @@ const session = new LoginSession();
 try {
   if (session.claim()) {
     try {
+      if (process.env.GARMIN_INSTALL_BROWSER === "1") {
+        session.write({ state: "pending", message: "Preparing Garmin sign-in. Checking Chrome and downloading it if needed; the browser will open when ready." });
+        await prepareConnection(true);
+      }
+      session.write({ state: "pending", message: "The Garmin browser is opening. Complete sign-in and MFA there, then run check_garmin_auth." });
       const auth = await new GarminAuth().authenticate();
       if (!auth) throw new Error("Login did not produce a valid session. Run authenticate_garmin to retry.");
       session.write({ state: "success", message: "Garmin login completed." });

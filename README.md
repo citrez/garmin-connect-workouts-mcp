@@ -32,16 +32,35 @@ directly in your account.
 Requires **Node >=22.12.0** on macOS, Windows, or Linux. Garmin sign-in needs a
 local graphical desktop. This is a desktop integration, not a hosted MCP service.
 
-### npm (recommended)
+### Easiest desktop installation
+
+- **Claude Desktop:** download `garmin-workouts-1.4.0.mcpb` from the
+  [release](https://github.com/citrez/garmin-connect-workouts-mcp/releases/tag/v1.4.0),
+  install it under Settings → Extensions, then say **Connect my Garmin**.
+  No terminal, npm install, API key or JSON editing is needed. The extension declares
+  a bundled host Node runtime requirement of >=22.12.0.
+- **ChatGPT Work / Codex desktop:** extract `garmin-workouts-plugin-1.4.0.zip`,
+  open the macOS/Windows launcher in `installers`, restart the app and install
+  Garmin Workouts from your personal marketplace. Then say **Connect my Garmin**.
+  This route requires Node >=22.12.0 on the computer.
+
+[Step-by-step desktop guide](docs/desktop-installation.md).
+
+### npm
 
 ```bash
-npm install --global @citrez/garmin-connect-workouts-mcp@1.3.0
-garmin-connect-workouts-mcp setup --install-browser
-garmin-connect-workouts-mcp login
+npm install --global @citrez/garmin-connect-workouts-mcp@1.4.0
 ```
 
-Then configure your MCP client as shown below. Every user signs into their own
-Garmin account; no source checkout or compilation is required.
+Register the ChatGPT/Codex plugin without editing JSON:
+
+```bash
+garmin-connect-workouts-mcp install-plugin
+```
+
+Or use an existing stdio MCP configuration. Every user signs into their own Garmin
+account. After tools are available, ask the assistant to **Connect my Garmin**;
+the background helper prepares Chrome and opens Garmin sign-in, including MFA.
 
 ### Prebuilt GitHub package
 
@@ -49,7 +68,7 @@ Download/install the versioned release; no clone, pnpm, compilation, or browser
 postinstall script is required:
 
 ```bash
-npm install --global https://github.com/citrez/garmin-connect-workouts-mcp/releases/download/v1.3.0/citrez-garmin-connect-workouts-mcp-1.3.0.tgz
+npm install --global https://github.com/citrez/garmin-connect-workouts-mcp/releases/download/v1.4.0/citrez-garmin-connect-workouts-mcp-1.4.0.tgz
 garmin-connect-workouts-mcp doctor
 garmin-connect-workouts-mcp setup --install-browser
 garmin-connect-workouts-mcp login
@@ -82,22 +101,15 @@ command = "garmin-connect-workouts-mcp"
 Restart/reconnect your MCP client after changing its configuration. The executable
 must be on the desktop client's PATH; if necessary use its full installed path.
 
-### Codex plugin
+### ChatGPT/Codex plugin
 
-Download `garmin-workouts-plugin-1.3.0.zip` from the
-[GitHub release](https://github.com/citrez/garmin-connect-workouts-mcp/releases/tag/v1.3.0)
-and extract it into a folder. It contains the standalone server, dependencies,
-setup and workout skills, and a repo marketplace at `.agents/plugins/marketplace.json`.
-Open that folder as a trusted project in Codex, refresh/restart the app, choose
-**Garmin Workouts** from its local plugin source, install it, and run setup.
-Alternatively add it to your personal marketplace; see [plugin installation](docs/distribution.md).
-
-The plugin runs locally and requires Node. Installing it does not share the
-publisher's Garmin account: every user signs into their own account.
+The release ZIP includes desktop launchers that register its local marketplace
+entry while preserving existing plugins. See [desktop installation](docs/desktop-installation.md).
+For custom marketplace layouts, see [manual distribution](docs/distribution.md).
 
 ### Run through npx
 
-Version 1.3.0 is available on [npm](https://www.npmjs.com/package/@citrez/garmin-connect-workouts-mcp).
+Version 1.4.0 is available on [npm](https://www.npmjs.com/package/@citrez/garmin-connect-workouts-mcp).
 To run without installing the executable globally, configure clients with:
 
 ```json
@@ -105,13 +117,17 @@ To run without installing the executable globally, configure clients with:
   "mcpServers": {
     "garmin-workouts": {
       "command": "npx",
-      "args": ["--yes", "@citrez/garmin-connect-workouts-mcp@1.3.0"]
+      "args": ["--yes", "@citrez/garmin-connect-workouts-mcp@1.4.0"]
     }
   }
 }
 ```
 
 ## Authentication
+
+For normal onboarding, call **`connect_garmin`** once and check progress with
+`check_garmin_auth`. It prepares Chrome in the background and opens Garmin sign-in.
+Use the individual setup/authentication tools below when diagnosing a specific stage.
 
 1. Run `doctor_garmin`; if Chrome is missing, run `setup_garmin` with
    `installBrowser=true`. Then run `authenticate_garmin`. It returns promptly and starts a separate local
@@ -180,6 +196,7 @@ helper to finish first. See [privacy](docs/privacy.md).
 
 | Command | Purpose |
 |---|---|
+| `install-plugin [--json]` | Register the ChatGPT/Codex plugin, preserving other marketplace entries. |
 | `serve` (default) | Start MCP over stdio. |
 | `doctor [--json] [--check-connection]` | Inspect prerequisites; optionally validate the saved session. |
 | `setup [--install-browser] [--json]` | Prepare storage; optionally install missing Chrome. |
@@ -198,6 +215,7 @@ helper to finish first. See [privacy](docs/privacy.md).
 | `delete_garmin_workout` | Delete a workout. |
 | `schedule_garmin_workout` | Put a workout on the Garmin Connect calendar for a date. |
 | `check_garmin_auth` | Check whether the stored Garmin session still works. |
+| `connect_garmin` | Prepare the browser and connect Garmin in one background setup flow. |
 | `authenticate_garmin` | Start/resume login in the background; check progress with `check_garmin_auth`. |
 | `doctor_garmin` | Inspect prerequisites; optionally check the session. |
 | `setup_garmin` | Prepare storage and optionally download missing Chrome. |
@@ -230,6 +248,9 @@ as a range, not a single point, so `4:00/km` on its own becomes a
 `4:00-4:10/km` range, widened by 10 seconds. Give both `fast` and `slow`
 explicitly for a narrower or different range.
 
+The MCP server also publishes a **`garmin_setup`** prompt and initialization
+instructions so Claude and other clients can discover the onboarding flow.
+
 ## Development
 
 ```bash
@@ -240,6 +261,7 @@ pnpm run dev        # run the server directly with tsx
 npm run test:package -- --browser-smoke  # clean npm install + real Chrome + MCP
 npm run release:artifacts              # npm tarball, plugin ZIP, SHA256 sums
 node scripts/plugin-smoke.mjs          # ZIP works without node_modules
+npm run test:desktop                  # MCPB, setup prompt and native launchers
 ```
 
 Tests cover login coordination, abandoned locks, error categories, credential-file
