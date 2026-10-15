@@ -1,18 +1,11 @@
-Garmin Workouts can now be installed from a prebuilt package or Codex plugin ZIP.
-Users sign into their own Garmin account in a dedicated browser, including MFA.
-No source checkout or compilation is needed.
+Install Garmin Workouts as a native Claude Desktop extension or a ChatGPT/Codex plugin, then say **Connect my Garmin**.
 
-- Standalone CLI/MCP/login helper with bundled runtime dependencies.
-- Setup detects Chrome and optionally installs a managed browser; doctor explains missing prerequisites.
-- Disconnect closes the Garmin browser and removes local credentials/profile.
-- Structured results distinguish missing login, network problems, rate limits, and Garmin outages.
-- Codex setup and workout skills cover interval shorthand, dates and lap-button warm-up/cool-down.
-- Automated packaged-install and browser checks cover macOS, Windows and Linux.
+- New `.mcpb` extension: server/dependencies included, zero required configuration; Claude supplies a compatible Node runtime (>=22.12.0).
+- ChatGPT/Codex ZIP includes macOS and Windows registration launchers; the installer preserves existing plugins and backs up marketplace changes.
+- One-step connection prepares Chrome in a detached helper and opens Garmin sign-in, including MFA. No sample workout is created during setup.
+- MCP setup prompt and server guidance make onboarding discoverable in Claude and other clients.
+- Official MCPB schema, host config expansion, protocol/helper, extracted package and launcher checks run across the desktop CI matrix.
 
-Requires Node >=22.12.0 and a graphical desktop for sign-in. Download the npm
-`.tgz` for command-line installation or the plugin `.zip` for Codex. Verify
-checksums with `SHA256SUMS`. See README and `docs/distribution.md` for setup.
+Download `garmin-workouts-1.4.0.mcpb` for Claude Desktop, or the plugin ZIP for ChatGPT Work/Codex desktop. See `docs/desktop-installation.md`. Existing npm/stdio installs remain supported. ChatGPT/Codex installation requires Node >=22.12.0; the native Claude extension declares that minimum for its bundled host runtime.
 
-GitHub artifacts are available independently of npm registry publication. This
-is an unofficial Garmin Connect integration; it is not a public OpenAI directory
-listing or a hosted service.
+This is an unofficial Garmin integration. Public directory listings require separate submission/review. Web/mobile hosting is not deployed; Garmin Developer Program approval and a selected host are prerequisites.

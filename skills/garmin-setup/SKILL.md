@@ -3,11 +3,11 @@ name: garmin-setup
 description: Connect a local Garmin account, diagnose setup, or disconnect it using the Garmin Workouts MCP tools.
 ---
 
-Use `doctor_garmin` to identify missing prerequisites, then `check_garmin_auth` to check the account. Browser sign-in requires a local graphical desktop; web and headless installations cannot run it.
+When the user asks to connect, call `connect_garmin` once. It checks an existing session and starts a detached helper that prepares Chrome and opens sign-in. It defaults to downloading official Chrome for Testing if no browser is available; the user's request to set up Garmin covers this prerequisite. Set `installBrowser=false` if they do not want a download.
 
-If Chrome is missing, use `setup_garmin` with `installBrowser=true` when the user has requested setup. This downloads Chrome for Testing to local app storage. An invalid `GARMIN_BROWSER_PATH` needs correction; do not silently ignore it.
+Tell the user to sign in and complete MFA in the dedicated browser, never in chat. Use `check_garmin_auth` for progress; the helper may still be downloading Chrome. Do not repeatedly start login while pending. Once the session is valid, setup is complete; do not create a sample workout unless asked.
 
-Call `authenticate_garmin` once. Tell the user to sign in and complete MFA in the dedicated browser, never in chat. Use `check_garmin_auth` for progress; avoid repeatedly launching login while it is pending. If the session is already valid, setup is complete. Do not create a sample workout as part of setup unless asked.
+Use `doctor_garmin` to diagnose setup failures. An invalid `GARMIN_BROWSER_PATH` must be corrected rather than silently ignored. Sign-in needs a graphical desktop. Use `setup_garmin` and `authenticate_garmin` separately only when diagnosing a specific stage.
 
 `NETWORK_ERROR`, `RATE_LIMITED`, and `GARMIN_UNAVAILABLE` do not mean the session expired. Preserve the account and report the actionable error. Observe `retryAfterSeconds` when provided; do not loop retries.
 

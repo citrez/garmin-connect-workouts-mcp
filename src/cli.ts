@@ -3,17 +3,23 @@ import { doctor, setup } from "./doctor.js";
 import { GarminAuth } from "./garmin-auth.js";
 import { LoginSession } from "./login-session.js";
 import { GarminError } from "./errors.js";
+import { installCodexPlugin } from "./install-plugin.js";
 import { VERSION } from "./version.js";
 
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0] || "serve";
-  const allowed: Record<string, string[]> = { serve: [], doctor: ["--json", "--check-connection"], setup: ["--install-browser", "--json"], login: [], logout: [], "--help": [], "--version": [] };
+  const allowed: Record<string, string[]> = { serve: [], "install-plugin": ["--json"], doctor: ["--json", "--check-connection"], setup: ["--install-browser", "--json"], login: [], logout: [], "--help": [], "--version": [] };
   if (!(command in allowed) || args.slice(1).some(arg => !allowed[command].includes(arg))) throw new GarminError("SETUP_REQUIRED", "Unknown command or option. Run --help for usage.");
   if (command === "serve") { await import("./mcp-server.js"); return; }
+  if (command === "install-plugin") {
+    const result = installCodexPlugin();
+    console.log(args.includes("--json") ? JSON.stringify(result) : result.message);
+    return;
+  }
   if (command === "--version") { console.log(VERSION); return; }
   if (command === "--help") {
-    console.log("Garmin Connect Workouts MCP\n\nserve (default)              Start the stdio MCP server\ndoctor [--check-connection] [--json]\n                            Inspect Node, browser, display and storage\nsetup [--install-browser] [--json]\n                            Prepare storage; optionally download Chrome\nlogin                       Open Garmin sign-in in a dedicated browser\nlogout                      Close that browser and clear local sign-in data\n--version                   Show package version\n\nRequires Node >=22.12.0 and a local graphical desktop for login.");
+    console.log("Garmin Connect Workouts MCP\n\nserve (default)              Start the stdio MCP server\ninstall-plugin [--json]      Register the ChatGPT/Codex desktop plugin\ndoctor [--check-connection] [--json]\n                            Inspect Node, browser, display and storage\nsetup [--install-browser] [--json]\n                            Prepare storage; optionally download Chrome\nlogin                       Open Garmin sign-in in a dedicated browser\nlogout                      Close that browser and clear local sign-in data\n--version                   Show package version\n\nRequires Node >=22.12.0 and a local graphical desktop for login.");
     return;
   }
   if (command === "doctor" || command === "setup") {
@@ -25,7 +31,7 @@ async function main() {
   if (command === "login") {
     const auth = new GarminAuth();
     if (await auth.getValidAuth()) { console.log("Already connected to Garmin."); return; }
-    await setup();
+    await setup(true);
     const session = new LoginSession();
     if (!session.claim()) throw new GarminError("LOGIN_BUSY", "Garmin login is already running. Complete sign-in in its browser window.");
     try {

@@ -39,6 +39,8 @@ jobs:
         run: npm run release:artifacts
       - name: Verify the standalone plugin archive
         run: node scripts/plugin-smoke.mjs
+      - name: Verify Claude desktop extension
+        run: npm run test:desktop
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest' && matrix.node == '24'
         with:

@@ -1,0 +1,45 @@
+{
+  "manifest_version": "0.3",
+  "name": "garmin-workouts",
+  "display_name": "Garmin Workouts",
+  "version": "1.4.0",
+  "description": "Describe a training session and create it in your own Garmin Connect account.",
+  "long_description": "Install this extension, then say Connect my Garmin. The extension detects Chrome or downloads Chrome for Testing when needed, opens a dedicated Garmin sign-in window, and supports MFA. Passwords stay on Garmin's website. Create, inspect, update, delete and schedule running, cycling and swimming workouts. No terminal commands, API keys or JSON configuration are required. A graphical desktop is required for browser sign-in. This is an unofficial integration and is not affiliated with Garmin.",
+  "author": { "name": "citrez", "url": "https://github.com/citrez" },
+  "repository": { "type": "git", "url": "https://github.com/citrez/garmin-connect-workouts-mcp" },
+  "homepage": "https://github.com/citrez/garmin-connect-workouts-mcp",
+  "documentation": "https://github.com/citrez/garmin-connect-workouts-mcp/blob/main/docs/desktop-installation.md",
+  "support": "https://github.com/citrez/garmin-connect-workouts-mcp/issues",
+  "icon": "assets/icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/cli.js",
+    "mcp_config": { "command": "node", "args": ["${__dirname}/dist/cli.js"] }
+  },
+  "tools": [
+    { "name": "connect_garmin", "description": "Prepare the browser and connect your Garmin account." },
+    { "name": "check_garmin_auth", "description": "Check connection and sign-in progress." },
+    { "name": "authenticate_garmin", "description": "Start or resume Garmin browser sign-in." },
+    { "name": "doctor_garmin", "description": "Diagnose local prerequisites." },
+    { "name": "setup_garmin", "description": "Prepare local storage and an optional browser download." },
+    { "name": "disconnect_garmin", "description": "Remove local credentials and the dedicated browser profile." },
+    { "name": "create_garmin_workout", "description": "Create a structured workout." },
+    { "name": "list_garmin_workouts", "description": "List saved workouts." },
+    { "name": "get_garmin_workout", "description": "Inspect a complete workout." },
+    { "name": "update_garmin_workout", "description": "Replace an existing workout." },
+    { "name": "delete_garmin_workout", "description": "Permanently delete a selected workout." },
+    { "name": "schedule_garmin_workout", "description": "Schedule a workout in the Garmin calendar." }
+  ],
+  "prompts": [
+    { "name": "garmin_setup", "description": "Connect Garmin and verify that workouts are ready.", "text": "Connect my Garmin account using connect_garmin, then check_garmin_auth. I will complete sign-in and MFA directly in Garmin's browser window. Once connected, tell me I can describe my workout." }
+  ],
+  "tools_generated": false,
+  "prompts_generated": false,
+  "keywords": ["garmin", "workouts", "running", "cycling", "swimming", "intervals"],
+  "license": "MIT",
+  "privacy_policies": [
+    "https://github.com/citrez/garmin-connect-workouts-mcp/blob/main/docs/privacy.md",
+    "https://www.garmin.com/en-US/privacy/connect/"
+  ],
+  "compatibility": { "platforms": ["darwin", "win32"], "runtimes": { "node": ">=22.12.0" } }
+}

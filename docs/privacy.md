@@ -11,3 +11,8 @@ Your MCP client receives the workout data you request and may handle it under it
 Disconnect using the `disconnect_garmin` tool or CLI `logout` to close the dedicated browser and remove local credentials, login state and its browser profile. This does not revoke other Garmin sessions or delete workouts. Remove the app directory to uninstall retained browser downloads after disconnecting.
 
 Installing a missing browser downloads Chrome for Testing from Google's distribution service. Package installation itself performs no browser download.
+
+The ChatGPT/Codex installer copies only the packaged plugin files and registers a
+local marketplace entry. It preserves existing entries and backs up changed
+marketplace JSON. It does not request or copy Garmin credentials during installation.
+The Claude extension likewise has no required password, token or API-key setting.

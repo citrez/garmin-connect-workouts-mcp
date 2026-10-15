@@ -38,7 +38,7 @@ try {
   try {
     await client.connect(transport);
     const tools = await client.listTools();
-    assert.equal(tools.tools.length, 11);
+    assert.equal(tools.tools.length, 12);
     assert(tools.tools.every(tool => tool.outputSchema));
     const auth = await client.callTool({ name: 'check_garmin_auth', arguments: {} });
     assert.equal(auth.isError, true); assert.equal(auth.structuredContent.code, 'AUTH_REQUIRED');

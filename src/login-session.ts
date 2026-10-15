@@ -69,7 +69,13 @@ export class LoginSession {
   }
 
   read(): LoginStatus | null {
-    if (this.isRunning()) return { state: "pending", message: "Login is in progress. Complete Garmin sign-in in the dedicated Chrome window, then run check_garmin_auth." };
+    if (this.isRunning()) {
+      try {
+        const status = JSON.parse(readFileSync(this.statusFile, "utf8")) as LoginStatus;
+        if (status.state === "pending" && typeof status.message === "string") return status;
+      } catch { /* The helper has not published progress yet. */ }
+      return { state: "pending", message: "Login is in progress. Complete Garmin sign-in in the dedicated Chrome window, then run check_garmin_auth." };
+    }
     try {
       const status = JSON.parse(readFileSync(this.statusFile, "utf8")) as LoginStatus;
       if (status.state === "pending") return { state: "error", message: "The login helper stopped before completing. Run authenticate_garmin to retry." };
@@ -78,7 +84,7 @@ export class LoginSession {
     return null;
   }
 
-  start(): LoginStatus {
+  start(options: { installBrowser?: boolean } = {}): LoginStatus {
     if (this.isRunning()) return this.read()!;
     // A detached helper survives MCP request timeouts and client restarts.
     const worker = fileURLToPath(new URL("./login-worker.js", import.meta.url));
@@ -87,7 +93,7 @@ export class LoginSession {
       this.write(status);
       return status;
     }
-    const child = spawn(process.execPath, [worker], { detached: true, stdio: "ignore", env: { ...process.env, GARMIN_CONFIG_DIR: this.directory } });
+    const child = spawn(process.execPath, [worker], { detached: true, stdio: "ignore", env: { ...process.env, GARMIN_CONFIG_DIR: this.directory, GARMIN_INSTALL_BROWSER: options.installBrowser ? "1" : "0" } });
     child.on("error", () => this.write({ state: "error", message: "Could not start the login helper. Build the package with pnpm run build and retry." }));
     child.unref();
     return { state: "pending", message: "Login helper started. A dedicated Chrome window will open or be reused. Sign in there, then run check_garmin_auth for progress or a specific error. No password should be entered in chat." };

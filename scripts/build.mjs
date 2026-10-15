@@ -10,7 +10,7 @@ execFileSync(process.execPath, [tsc, '--noEmit'], { stdio: 'inherit' });
 rmSync('dist', { recursive: true, force: true });
 mkdirSync('dist');
 const result = await build({
-  entryPoints: ['src/cli.ts', 'src/mcp-server.ts', 'src/login-worker.ts'],
+  entryPoints: ['src/cli.ts', 'src/mcp-server.ts', 'src/login-worker.ts', 'src/install-plugin.ts'],
   outdir: 'dist', bundle: true, platform: 'node', format: 'esm', target: 'node22',
   sourcemap: false, metafile: true, legalComments: 'eof',
   banner: { js: 'import { createRequire as __createRequire } from "node:module"; const require = __createRequire(import.meta.url);' },
